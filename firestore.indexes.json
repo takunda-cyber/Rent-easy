@@ -1,7 +1,7 @@
 {
   "indexes": [
     {
-      "collection": "rooms",
+      "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -15,7 +15,7 @@
       ]
     },
     {
-      "collection": "rooms",
+      "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -29,7 +29,25 @@
       ]
     },
     {
-      "collection": "rooms",
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "location",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "price",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -43,7 +61,7 @@
       ]
     },
     {
-      "collection": "rooms",
+      "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [
         {

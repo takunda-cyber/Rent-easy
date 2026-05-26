@@ -1,267 +1,171 @@
-# Rent Easy - Phase 1 Setup Guide
+# 🚀 Rent Easy - Complete Setup Guide
 
-## 🚀 Quick Start
+## Phase 1: Foundation Setup
 
-Follow these steps to get your Rent Easy app running locally and deployed to Firebase.
+### Step 1: Prerequisites
 
----
+1. **Node.js & npm**
+   ```bash
+   node --version  # Should be v14+
+   npm --version
+   ```
 
-## **Step 1: Install Firebase CLI**
+2. **Firebase CLI**
+   ```bash
+   npm install -g firebase-tools
+   firebase --version
+   ```
 
-```bash
-# Install globally
-npm install -g firebase-tools
+### Step 2: Create Firebase Project
 
-# Login to Firebase
-firebase login
-```
+1. Go to [firebase.google.com](https://firebase.google.com)
+2. Click "Get Started" → "Add Project"
+3. **Project Name:** `rent-easy-zw` (or similar)
+4. **Analytics:** Enable (optional)
+5. Click "Create Project" and wait for completion
 
----
+### Step 3: Get Firebase Credentials
 
-## **Step 2: Create Firebase Project**
+1. In Firebase Console → Project Settings (⚙️)
+2. Scroll to "Your apps" → Click "Web" (</>
+3. Copy the config:
+   ```javascript
+   {
+     apiKey: "...",
+     authDomain: "...",
+     projectId: "...",
+     storageBucket: "...",
+     messagingSenderId: "...",
+     appId: "..."
+   }
+   ```
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click "Create Project"
-3. Name it "Rent Easy" or similar
-4. Accept terms and create
-5. Skip Google Analytics for now
-
----
-
-## **Step 3: Set Up Firebase Services**
-
-### Enable Firestore Database:
-1. In Firebase Console → Firestore Database
-2. Click "Create database"
-3. Choose "Start in test mode" (for development)
-4. Select region closest to Zimbabwe (Africa: `europe-west1`)
-5. Create
-
-### Enable Cloud Storage:
-1. Firebase Console → Storage
-2. Click "Get started"
-3. Accept default rules
-4. Create
-
-### Enable Authentication:
-1. Firebase Console → Authentication
-2. Click "Get started"
-3. Enable "Anonymous" sign-in method
-4. Save
-
----
-
-## **Step 4: Get Firebase Credentials**
-
-1. Firebase Console → Project Settings (⚙️ icon)
-2. Scroll to "Your apps"
-3. Click "Web" icon (if no app exists, add one)
-4. Copy the config object:
-
-```javascript
-{
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-}
-```
-
----
-
-## **Step 5: Set Up Local Environment**
-
-### Create `.env` file:
+### Step 4: Set Up Environment Variables
 
 ```bash
-# In repository root
+# Clone or navigate to your project
+cd rent-easy
+
+# Copy example file
 cp .env.example .env
+
+# Edit .env and paste your Firebase config
+nano .env
 ```
 
-### Edit `.env` and add your Firebase credentials:
-
+**Example .env:**
 ```
-VITE_FIREBASE_API_KEY=YOUR_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID=YOUR_APP_ID
-ADMIN_EMAIL=youremail@gmail.com
+VITE_FIREBASE_API_KEY=AIzaSyDemoKey123456
+VITE_FIREBASE_AUTH_DOMAIN=renteasyzw.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=renteasyzw
+VITE_FIREBASE_STORAGE_BUCKET=renteasyzw.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789012
+VITE_FIREBASE_APP_ID=1:123456789012:web:abcdef123456
+VITE_ADMIN_EMAILS=you@example.com
 ```
 
-⚠️ **IMPORTANT:** Never commit `.env` to GitHub!
+### Step 5: Enable Firebase Services
 
----
+1. **Firestore Database:**
+   - Firebase Console → Firestore Database
+   - Click "Create Database"
+   - Start in **Test Mode** (for development)
+   - Select region: `us-central1`
 
-## **Step 6: Deploy Security Rules**
+2. **Cloud Storage:**
+   - Firebase Console → Storage
+   - Click "Get Started"
+   - Accept defaults
+   - Click "Done"
 
-### Initialize Firebase in your project:
+3. **Authentication:**
+   - Firebase Console → Authentication
+   - Click "Get Started"
+   - Enable **Anonymous** auth
+
+### Step 6: Deploy Security Rules
 
 ```bash
-# In repository root
+# Initialize Firebase (first time only)
 firebase init
+# Select: Firestore, Storage, Hosting
+# Use project: renteasyzw
+# Accept defaults for most prompts
 
-# Select:
-# - Firestore
-# - Storage
-# - Hosting
-# - Functions
+# Deploy Firestore rules
+firebase deploy --only firestore:rules
+
+# Deploy Storage rules
+firebase deploy --only storage:rules
 ```
 
-### Update `firebase.json`:
-
-Replace the storage bucket name with your actual bucket:
-
-```json
-"storage": [
-  {
-    "bucket": "YOUR_PROJECT.appspot.com",
-    "rules": "storage.rules"
-  }
-]
-```
-
-### Deploy rules:
+### Step 7: Deploy Cloud Functions
 
 ```bash
-firebase deploy --only firestore:rules,storage:rules
-```
-
-✅ Your security rules are now live!
-
----
-
-## **Step 7: Deploy Cloud Functions**
-
-### Install dependencies:
-
-```bash
+# Navigate to functions directory
 cd functions
+
+# Install dependencies
 npm install
+
+# Go back to root
 cd ..
-```
 
-### Deploy functions:
-
-```bash
+# Deploy functions
 firebase deploy --only functions
 ```
 
-✅ Cloud Functions are now deployed!
-
----
-
-## **Step 8: Set Up Hosting**
-
-### Copy your app to public folder:
+### Step 8: Deploy to Hosting
 
 ```bash
-mkdir -p public
-cp index.html public/
-cp styles.css public/ 2>/dev/null || true
-cp script.js public/ 2>/dev/null || true
-```
+# Deploy everything
+firebase deploy
 
-### Deploy to Firebase Hosting:
-
-```bash
+# OR deploy just hosting
 firebase deploy --only hosting
 ```
 
-✅ Your app is now live! Check the hosting URL.
+### Step 9: Test the App
 
----
+1. Get your Firebase Hosting URL from deploy output
+2. Open it in browser
+3. Test:
+   - ✅ Sign in works
+   - ✅ Post a room works
+   - ✅ Upload image works
+   - ✅ View rooms works
+   - ✅ Delete room works
 
-## **Step 9: Test the App**
+## Troubleshooting
 
-1. Open your Firebase Hosting URL
-2. Try to sign in (should work with Anonymous Auth)
-3. Try to post a room:
-   - Add title: "2-bed apartment"
-   - Add location: "Harare"
-   - Add price: "500"
-   - Add phone: "+263701234567"
-   - Upload an image (JPG/PNG/WebP, <5MB)
-   - Click "Post Room"
-4. Verify room appears in the list
-5. Try to contact owner (WhatsApp link should work)
+### Issue: "Firebase config is not defined"
+**Solution:** Update Firebase config in `public/index.html` lines 304-312
 
----
-
-## **Step 10: Set Up Admin Features**
-
-### Add admin claims to your user:
-
+### Issue: "Permission denied" when uploading
+**Solution:** Check Storage rules are deployed:
 ```bash
-# Get your Firebase user ID from Firebase Console → Authentication
-firebase functions:shell
-
-# In the shell:
-admin.auth().setCustomUserClaims("YOUR_USER_ID", {admin: true}).then(() => console.log("Done"));
-exit;
+firebase deploy --only storage:rules
 ```
 
-✅ You now have admin powers!
+### Issue: "Cannot read property 'uid' of null"
+**Solution:** User needs to sign in first. Check auth flow.
 
----
+### Issue: Images not uploading
+**Solution:** 
+1. Check file size < 5MB
+2. Check file type is JPEG/PNG/WebP
+3. Check Storage bucket exists
 
-## **Step 11: Monitor and Debug**
+## Next Steps
 
-### View Firestore data:
-```bash
-firebase firestore:export --backup-dir backups/
-```
-
-### View Cloud Function logs:
-```bash
-firebase functions:log
-```
-
-### View Hosting analytics:
-- Firebase Console → Hosting → Analytics
-
----
-
-## **Troubleshooting**
-
-### "Access Denied" error:
-- Check security rules are deployed
-- Check Firestore/Storage are enabled
-- Check authentication is enabled
-
-### "Image won't upload":
-- File must be JPEG, PNG, or WebP
-- File must be under 5MB
-- Check storage.rules are deployed
-
-### "Cloud Functions not working":
-- Run `firebase deploy --only functions` again
-- Check `firebase functions:log` for errors
-- Verify `firebase.json` has correct bucket name
-
-### "Firebase config not working":
-- Double-check `.env` file has correct values
-- Verify `.env` is in root directory
-- Restart dev server if running locally
-
----
-
-## **Next Steps**
-
-Your Phase 1 foundation is complete! You can now:
-
-- ✅ Post and browse rooms
-- ✅ Secure upload images
-- ✅ Use Cloud Functions for validation
-- ✅ Monitor usage in Firebase Console
-
-**Ready for Phase 2?** I can add:
-- Search/filter by location & price
+Phase 2 features:
 - User profiles
-- Room view counter
-- Better UI/UX
+- Room ratings & reviews
+- Analytics dashboard
+- Search improvements
+- Payment integration
 
-Let me know! 🚀
+## Support
+
+For Firebase issues: [Firebase Docs](https://firebase.google.com/docs)
+For help: Check `CLOUD_FUNCTIONS_GUIDE.md`

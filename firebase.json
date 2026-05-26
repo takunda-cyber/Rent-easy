@@ -5,7 +5,7 @@
   },
   "storage": [
     {
-      "bucket": "YOUR_PROJECT.appspot.com",
+      "bucket": "your_project.appspot.com",
       "rules": "storage.rules"
     }
   ],
@@ -24,21 +24,8 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css)",
+        "source": "/**",
         "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "max-age=31536000"
-          }
-        ]
-      },
-      {
-        "source": "index.html",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "max-age=0, must-revalidate"
-          },
           {
             "key": "X-Content-Type-Options",
             "value": "nosniff"
@@ -50,9 +37,17 @@
           {
             "key": "X-XSS-Protection",
             "value": "1; mode=block"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
           }
         ]
       }
     ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs18"
   }
 }

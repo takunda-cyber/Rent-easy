@@ -1,87 +1,67 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
     // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    function isValidRoom(data) {
-      return data.size() == 8 &&
-             data.title is string &&
-             data.title.size() >= 5 &&
-             data.title.size() <= 100 &&
-             data.location is string &&
-             data.location.size() > 0 &&
-             data.price is string &&
-             int(data.price) >= 0 &&
-             int(data.price) <= 1000000 &&
-             data.phone is string &&
-             data.phone.size() >= 10 &&
-             data.imageUrl is string &&
-             data.userId is string &&
-             data.featured is bool &&
-             data.createdAt is number;
+
+    function isAdmin() {
+      return request.auth.uid in get(/databases/$(database)/documents/admins/list).data.uids;
     }
-    
-    function isValidUpdate(data) {
-      return (data.title is string && data.title.size() >= 5 && data.title.size() <= 100) ||
-             (data.location is string && data.location.size() > 0) ||
-             (data.price is string && int(data.price) >= 0 && int(data.price) <= 1000000);
+
+    function validRoom(room) {
+      return room.size() == 8 &&
+             room.title is string && room.title.size() >= 5 && room.title.size() <= 100 &&
+             room.location is string && room.location.size() >= 2 && room.location.size() <= 50 &&
+             room.price is number && room.price > 0 && room.price <= 100000 &&
+             room.phone is string && room.phone.matches('^\\+?[0-9\\s\\-\\(\\)]{7,}$') &&
+             room.imageUrl is string &&
+             room.userId is string &&
+             room.featured is bool &&
+             room.createdAt is number;
     }
-    
+
     // Rooms collection
-    match /rooms/{document=**} {
-      // Anyone can read
-      allow read: if true;
-      
-      // Only authenticated users can create
-      allow create: if isAuthenticated() &&
-                       request.resource.data.userId == request.auth.uid &&
-                       isValidRoom(request.resource.data);
-      
-      // Only owner can update (limited fields)
-      allow update: if isAuthenticated() &&
-                       resource.data.userId == request.auth.uid &&
-                       isValidUpdate(request.resource.data);
-      
-      // Only owner can delete
-      allow delete: if isAuthenticated() &&
-                       resource.data.userId == request.auth.uid;
+    match /rooms/{roomId} {
+      // Read: Anyone authenticated can read
+      allow read: if isAuthenticated();
+
+      // Create: Authenticated users can create their own rooms
+      allow create: if isAuthenticated() && 
+                      validRoom(request.resource.data) &&
+                      isOwner(request.resource.data.userId);
+
+      // Update: Only owner can update, or admin
+      allow update: if isAuthenticated() && 
+                      (isOwner(resource.data.userId) || isAdmin()) &&
+                      validRoom(request.resource.data);
+
+      // Delete: Only owner or admin can delete
+      allow delete: if isAuthenticated() && 
+                      (isOwner(resource.data.userId) || isAdmin());
     }
-    
-    // User profiles collection
+
+    // Admin collection
+    match /admins/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false; // Managed via Cloud Functions
+    }
+
+    // User profiles
     match /users/{userId} {
-      // Users can read their own profile
-      allow read: if isAuthenticated() && isOwner(userId);
-      
-      // Users can create/update their own profile
-      allow create, update: if isAuthenticated() &&
-                              isOwner(userId) &&
-                              request.resource.data.userId == userId &&
-                              request.resource.data.email is string;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId);
     }
-    
-    // Reviews collection
-    match /rooms/{roomId}/reviews/{document=**} {
-      // Anyone can read reviews
-      allow read: if true;
-      
-      // Authenticated users can create reviews
-      allow create: if isAuthenticated() &&
-                       request.resource.data.userId == request.auth.uid &&
-                       request.resource.data.rating >= 1 &&
-                       request.resource.data.rating <= 5 &&
-                       request.resource.data.comment is string;
-      
-      // Only review author can update/delete
-      allow update, delete: if isAuthenticated() &&
-                              resource.data.userId == request.auth.uid;
+
+    // Activity logs (admin only)
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // System only
     }
   }
 }

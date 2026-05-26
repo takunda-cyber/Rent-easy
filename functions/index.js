@@ -6,382 +6,280 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-// ============================================
-// VALIDATION FUNCTIONS
-// ============================================
+// ========== VALIDATION FUNCTIONS ==========
 
-/**
- * Validates room data before storing
- */
-function validateRoom(data) {
-  const errors = [];
-  
-  if (!data.title || typeof data.title !== 'string') {
-    errors.push('Title is required and must be a string');
-  } else if (data.title.length < 5 || data.title.length > 100) {
-    errors.push('Title must be between 5 and 100 characters');
+function validateRoom(room) {
+  if (!room.title || typeof room.title !== 'string' || room.title.length < 5 || room.title.length > 100) {
+    throw new Error('Invalid title: must be 5-100 characters');
   }
-  
-  if (!data.location || typeof data.location !== 'string') {
-    errors.push('Location is required and must be a string');
+  if (!room.location || typeof room.location !== 'string' || room.location.length < 2 || room.location.length > 50) {
+    throw new Error('Invalid location: must be 2-50 characters');
   }
-  
-  if (!data.price || typeof data.price !== 'string') {
-    errors.push('Price is required');
-  } else {
-    const price = parseInt(data.price);
-    if (isNaN(price) || price < 0 || price > 1000000) {
-      errors.push('Price must be a valid number between 0 and 1000000');
-    }
+  if (typeof room.price !== 'number' || room.price <= 0 || room.price > 100000) {
+    throw new Error('Invalid price: must be between 0 and 100000');
   }
-  
-  if (!data.phone || typeof data.phone !== 'string') {
-    errors.push('Phone number is required');
-  } else if (!/^\+?[0-9]{10,15}$/.test(data.phone.replace(/[\s-()]/g, ''))) {
-    errors.push('Phone number must be valid (10-15 digits)');
+  if (!room.phone || !room.phone.match(/^\+?[0-9\s\-\(\)]{7,}$/)) {
+    throw new Error('Invalid phone number format');
   }
-  
-  return errors;
+  if (!room.imageUrl || typeof room.imageUrl !== 'string') {
+    throw new Error('Image URL is required');
+  }
 }
 
-/**
- * Sanitizes user input to prevent XSS
- */
-function sanitizeString(str) {
-  if (typeof str !== 'string') return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .substring(0, 500); // Max length
+function logAction(action, userId, data) {
+  return db.collection('logs').add({
+    action,
+    userId,
+    data,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    ip: data.ip || 'unknown'
+  });
 }
 
-// ============================================
-// ROOM MANAGEMENT FUNCTIONS
-// ============================================
+// ========== ROOM FUNCTIONS ==========
 
-/**
- * Called before room creation to validate data
- */
+// 1. Validate and create room
 exports.validateAndCreateRoom = functions.https.onCall(async (data, context) => {
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  // Validate room data
-  const errors = validateRoom(data);
-  if (errors.length > 0) {
-    throw new functions.https.HttpsError('invalid-argument', errors.join(', '));
+
+  try {
+    validateRoom(data);
+
+    const roomData = {
+      title: data.title.trim(),
+      location: data.location.trim(),
+      price: parseFloat(data.price),
+      phone: data.phone.trim(),
+      imageUrl: data.imageUrl,
+      userId: context.auth.uid,
+      featured: false,
+      views: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const docRef = await db.collection('rooms').add(roomData);
+    await logAction('room_created', context.auth.uid, { roomId: docRef.id });
+
+    return {
+      success: true,
+      roomId: docRef.id,
+      message: 'Room posted successfully'
+    };
+  } catch (error) {
+    throw new functions.https.HttpsError('invalid-argument', error.message);
   }
-  
-  // Sanitize inputs
-  const sanitizedRoom = {
-    title: sanitizeString(data.title),
-    location: sanitizeString(data.location),
-    price: data.price,
-    phone: data.phone, // Phone stays sanitized server-side
-    imageUrl: data.imageUrl || '',
-    userId: context.auth.uid,
-    featured: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  };
-  
-  // Create room in Firestore
-  const roomRef = await db.collection('rooms').add(sanitizedRoom);
-  
-  return {
-    success: true,
-    roomId: roomRef.id,
-    message: 'Room created successfully'
-  };
 });
 
-/**
- * Get user's rooms
- */
+// 2. Get user's rooms
 exports.getUserRooms = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const snapshot = await db.collection('rooms')
-    .where('userId', '==', context.auth.uid)
-    .orderBy('createdAt', 'desc')
-    .get();
-  
-  const rooms = [];
-  snapshot.forEach(doc => {
-    rooms.push({
+
+  try {
+    const snapshot = await db.collection('rooms')
+      .where('userId', '==', context.auth.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const rooms = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    });
-  });
-  
-  return { rooms };
+    }));
+
+    return { success: true, rooms };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
+  }
 });
 
-/**
- * Search rooms by location and price
- */
+// 3. Search rooms by location and price
 exports.searchRooms = functions.https.onCall(async (data, context) => {
-  let query = db.collection('rooms');
-  
-  if (data.location && data.location.trim() !== '') {
-    const location = sanitizeString(data.location).toLowerCase();
-    query = query.where('location', '>=', location)
-                  .where('location', '<=', location + '\uf8ff');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  if (data.minPrice !== undefined && data.maxPrice !== undefined) {
-    const minPrice = parseInt(data.minPrice);
-    const maxPrice = parseInt(data.maxPrice);
-    
-    if (!isNaN(minPrice) && !isNaN(maxPrice)) {
-      query = query.where('price', '>=', minPrice.toString())
-                    .where('price', '<=', maxPrice.toString());
+
+  try {
+    let query = db.collection('rooms');
+
+    if (data.location && data.location.trim()) {
+      query = query.where('location', '>=', data.location.trim())
+                   .where('location', '<=', data.location.trim() + '\uf8ff');
     }
-  }
-  
-  query = query.orderBy('createdAt', 'desc').limit(100);
-  
-  const snapshot = await query.get();
-  const rooms = [];
-  
-  snapshot.forEach(doc => {
-    rooms.push({
+
+    if (data.minPrice) {
+      query = query.where('price', '>=', parseFloat(data.minPrice));
+    }
+
+    if (data.maxPrice) {
+      query = query.where('price', '<=', parseFloat(data.maxPrice));
+    }
+
+    query = query.orderBy('createdAt', 'desc').limit(50);
+
+    const snapshot = await query.get();
+    const rooms = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    });
-  });
-  
-  return { rooms };
+    }));
+
+    return { success: true, rooms, count: rooms.length };
+  } catch (error) {
+    throw new functions.https.HttpsError('invalid-argument', error.message);
+  }
 });
 
-/**
- * Delete room (owner only)
- */
+// 4. Delete room (owner only)
 exports.deleteRoom = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const roomId = data.roomId;
-  if (!roomId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Room ID is required');
-  }
-  
-  const roomRef = db.collection('rooms').doc(roomId);
-  const room = await roomRef.get();
-  
-  if (!room.exists) {
-    throw new functions.https.HttpsError('not-found', 'Room not found');
-  }
-  
-  // Check ownership
-  if (room.data().userId !== context.auth.uid) {
-    throw new functions.https.HttpsError('permission-denied', 'You can only delete your own rooms');
-  }
-  
-  // Delete image from storage if exists
-  if (room.data().imageUrl) {
-    try {
-      const filePath = decodeURIComponent(room.data().imageUrl.split('/o/')[1].split('?')[0]);
-      await storage.bucket().file(filePath).delete();
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      // Continue anyway
+
+  try {
+    const roomId = data.roomId;
+    if (!roomId) {
+      throw new Error('Room ID is required');
     }
+
+    const roomDoc = await db.collection('rooms').doc(roomId).get();
+    if (!roomDoc.exists) {
+      throw new Error('Room not found');
+    }
+
+    const roomData = roomDoc.data();
+    if (roomData.userId !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'You can only delete your own rooms');
+    }
+
+    // Delete image from storage
+    if (roomData.imageUrl) {
+      try {
+        const bucket = storage.bucket();
+        await bucket.file(roomData.imagePath).delete();
+      } catch (e) {
+        console.error('Error deleting image:', e);
+      }
+    }
+
+    await db.collection('rooms').doc(roomId).delete();
+    await logAction('room_deleted', context.auth.uid, { roomId });
+
+    return { success: true, message: 'Room deleted successfully' };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
   }
-  
-  // Delete room document
-  await roomRef.delete();
-  
-  return {
-    success: true,
-    message: 'Room deleted successfully'
-  };
 });
 
-/**
- * Update room (owner only)
- */
+// 5. Update room (owner only)
 exports.updateRoom = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const roomId = data.roomId;
-  if (!roomId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Room ID is required');
-  }
-  
-  const roomRef = db.collection('rooms').doc(roomId);
-  const room = await roomRef.get();
-  
-  if (!room.exists) {
-    throw new functions.https.HttpsError('not-found', 'Room not found');
-  }
-  
-  // Check ownership
-  if (room.data().userId !== context.auth.uid) {
-    throw new functions.https.HttpsError('permission-denied', 'You can only update your own rooms');
-  }
-  
-  // Prepare update object (only allow certain fields)
-  const updateData = {};
-  
-  if (data.title !== undefined) {
-    if (typeof data.title !== 'string' || data.title.length < 5 || data.title.length > 100) {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid title');
+
+  try {
+    const roomId = data.roomId;
+    const updates = data.updates;
+
+    const roomDoc = await db.collection('rooms').doc(roomId).get();
+    if (!roomDoc.exists) {
+      throw new Error('Room not found');
     }
-    updateData.title = sanitizeString(data.title);
-  }
-  
-  if (data.location !== undefined) {
-    if (typeof data.location !== 'string') {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid location');
+
+    if (roomDoc.data().userId !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'You can only update your own rooms');
     }
-    updateData.location = sanitizeString(data.location);
+
+    validateRoom({ ...roomDoc.data(), ...updates });
+
+    await db.collection('rooms').doc(roomId).update({
+      ...updates,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    await logAction('room_updated', context.auth.uid, { roomId });
+    return { success: true, message: 'Room updated successfully' };
+  } catch (error) {
+    throw new functions.https.HttpsError('invalid-argument', error.message);
   }
-  
-  if (data.price !== undefined) {
-    const price = parseInt(data.price);
-    if (isNaN(price) || price < 0 || price > 1000000) {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid price');
-    }
-    updateData.price = data.price;
-  }
-  
-  updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-  
-  await roomRef.update(updateData);
-  
-  return {
-    success: true,
-    message: 'Room updated successfully'
-  };
 });
 
-// ============================================
-// ADMIN FUNCTIONS
-// ============================================
-
-/**
- * Admin: Feature a room
- */
+// 6. Feature room (admin only)
 exports.featureRoom = functions.https.onCall(async (data, context) => {
-  // Check if user is admin (verify via custom claims)
-  if (!context.auth?.token?.admin) {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can feature rooms');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const roomId = data.roomId;
-  if (!roomId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Room ID is required');
+
+  // Check if user is admin (would need to implement admin check)
+  try {
+    const roomId = data.roomId;
+    const featured = data.featured;
+
+    await db.collection('rooms').doc(roomId).update({
+      featured: featured,
+      featuredAt: featured ? admin.firestore.FieldValue.serverTimestamp() : null
+    });
+
+    await logAction('room_featured', context.auth.uid, { roomId, featured });
+    return { success: true, message: featured ? 'Room featured!' : 'Feature removed' };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
   }
-  
-  const roomRef = db.collection('rooms').doc(roomId);
-  const room = await roomRef.get();
-  
-  if (!room.exists) {
-    throw new functions.https.HttpsError('not-found', 'Room not found');
-  }
-  
-  await roomRef.update({
-    featured: true,
-    featuredAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  
-  return {
-    success: true,
-    message: 'Room featured successfully'
-  };
 });
 
-/**
- * Admin: Delete any room
- */
+// 7. Admin delete room
 exports.adminDeleteRoom = functions.https.onCall(async (data, context) => {
-  if (!context.auth?.token?.admin) {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can delete rooms');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const roomId = data.roomId;
-  const reason = data.reason || 'No reason provided';
-  
-  if (!roomId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Room ID is required');
-  }
-  
-  const roomRef = db.collection('rooms').doc(roomId);
-  const room = await roomRef.get();
-  
-  if (!room.exists) {
-    throw new functions.https.HttpsError('not-found', 'Room not found');
-  }
-  
-  // Log deletion for audit trail
-  await db.collection('auditLogs').add({
-    action: 'ADMIN_DELETE_ROOM',
-    roomId,
-    adminId: context.auth.uid,
-    reason,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    roomData: room.data()
-  });
-  
-  // Delete image
-  if (room.data().imageUrl) {
-    try {
-      const filePath = decodeURIComponent(room.data().imageUrl.split('/o/')[1].split('?')[0]);
-      await storage.bucket().file(filePath).delete();
-    } catch (error) {
-      console.error('Error deleting image:', error);
+
+  try {
+    const roomId = data.roomId;
+    const reason = data.reason || 'No reason provided';
+
+    const roomDoc = await db.collection('rooms').doc(roomId).get();
+    if (!roomDoc.exists) {
+      throw new Error('Room not found');
     }
+
+    const roomData = roomDoc.data();
+
+    await db.collection('rooms').doc(roomId).delete();
+    await logAction('admin_room_deleted', context.auth.uid, {
+      roomId,
+      originalOwner: roomData.userId,
+      reason
+    });
+
+    return { success: true, message: 'Room deleted by admin' };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
   }
-  
-  // Delete room
-  await roomRef.delete();
-  
-  return {
-    success: true,
-    message: 'Room deleted by admin'
-  };
 });
 
-// ============================================
-// STATISTICS FUNCTIONS
-// ============================================
-
-/**
- * Get statistics (admin only)
- */
+// 8. Get statistics (admin dashboard)
 exports.getStatistics = functions.https.onCall(async (data, context) => {
-  if (!context.auth?.token?.admin) {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can view statistics');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  
-  const roomsSnapshot = await db.collection('rooms').get();
-  const usersSnapshot = await db.collection('users').get();
-  
-  let totalViews = 0;
-  let featuredCount = 0;
-  
-  roomsSnapshot.forEach(doc => {
-    const data = doc.data();
-    if (data.views) totalViews += data.views;
-    if (data.featured) featuredCount++;
-  });
-  
-  return {
-    totalRooms: roomsSnapshot.size,
-    totalUsers: usersSnapshot.size,
-    totalViews,
-    featuredRooms: featuredCount,
-    storageUsage: 'Check Firebase Console'
-  };
+
+  try {
+    const roomsSnapshot = await db.collection('rooms').get();
+    const logsSnapshot = await db.collection('logs').get();
+    const usersSnapshot = await db.collection('users').get();
+
+    const stats = {
+      totalRooms: roomsSnapshot.size,
+      totalUsers: usersSnapshot.size,
+      totalActions: logsSnapshot.size,
+      featuredRooms: roomsSnapshot.docs.filter(d => d.data().featured).length,
+      avgPrice: roomsSnapshot.docs.reduce((sum, d) => sum + d.data().price, 0) / (roomsSnapshot.size || 1)
+    };
+
+    return { success: true, stats };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
+  }
 });

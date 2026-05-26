@@ -1,67 +1,63 @@
-# Cloud Functions Guide
+# ☁️ Cloud Functions Guide
 
 ## Overview
 
-Cloud Functions provide server-side logic for your Rent Easy app. They validate data, prevent abuse, and enforce security rules.
+Cloud Functions provide server-side validation, security, and logic for your Rent Easy app.
 
----
+## Functions List
 
-## Available Functions
+### 1. `validateAndCreateRoom`
+**Purpose:** Create a new room with server-side validation
 
-### 1. **validateAndCreateRoom**
-Validates and creates a new room listing.
+**Called From:** Frontend when user clicks "Post Room"
 
-**Usage:**
+**Parameters:**
 ```javascript
-const functions = getFunctions();
-const createRoom = httpsCallable(functions, 'validateAndCreateRoom');
-
-try {
-  const result = await createRoom({
-    title: "2-bed apartment",
-    location: "Harare",
-    price: "500",
-    phone: "+263701234567",
-    imageUrl: "gs://..." // URL from storage
-  });
-  console.log('Room created:', result.data.roomId);
-} catch (error) {
-  console.error('Error:', error.message);
+{
+  title: "2-Bed Apartment",
+  location: "Harare",
+  price: 500,
+  phone: "+263771234567",
+  imageUrl: "gs://bucket/path/to/image.jpg"
 }
-```
-
-**Validations:**
-- Title: 5-100 characters
-- Location: Not empty
-- Price: 0-1,000,000
-- Phone: 10-15 digits
-- Prevents XSS attacks via sanitization
-
----
-
-### 2. **getUserRooms**
-Gets all rooms posted by the current user.
-
-**Usage:**
-```javascript
-const getUserRoomsFunc = httpsCallable(functions, 'getUserRooms');
-
-const result = await getUserRoomsFunc();
-console.log('My rooms:', result.data.rooms);
 ```
 
 **Returns:**
 ```javascript
 {
+  success: true,
+  roomId: "abc123",
+  message: "Room posted successfully"
+}
+```
+
+**Validation:**
+- Title: 5-100 characters
+- Location: 2-50 characters
+- Price: 0-100,000 USD
+- Phone: Valid format with regex
+- Image: Must exist
+
+---
+
+### 2. `getUserRooms`
+**Purpose:** Get all rooms posted by current user
+
+**Called From:** "My Rooms" tab
+
+**Parameters:** None (uses user auth context)
+
+**Returns:**
+```javascript
+{
+  success: true,
   rooms: [
     {
-      id: "room123",
-      title: "2-bed apartment",
+      id: "room1",
+      title: "2-Bed",
       location: "Harare",
-      price: "500",
-      imageUrl: "gs://...",
-      createdAt: 1234567890,
-      featured: false
+      price: 500,
+      ...
     }
   ]
 }
@@ -69,200 +65,248 @@ console.log('My rooms:', result.data.rooms);
 
 ---
 
-### 3. **searchRooms**
-Searches rooms by location and/or price range.
+### 3. `searchRooms`
+**Purpose:** Search rooms by location and price range
 
-**Usage:**
-```javascript
-const searchRoomsFunc = httpsCallable(functions, 'searchRooms');
-
-const result = await searchRoomsFunc({
-  location: "Harare",
-  minPrice: "300",
-  maxPrice: "800"
-});
-console.log('Results:', result.data.rooms);
-```
+**Called From:** Browse tab search button
 
 **Parameters:**
-- `location` (optional): City name
-- `minPrice` (optional): Minimum price
-- `maxPrice` (optional): Maximum price
-
----
-
-### 4. **deleteRoom**
-Deletes a room (owner only).
-
-**Usage:**
 ```javascript
-const deleteRoomFunc = httpsCallable(functions, 'deleteRoom');
-
-const result = await deleteRoomFunc({
-  roomId: "room123"
-});
-console.log('Room deleted');
-```
-
-**Security:**
-- Only room owner can delete
-- Removes image from storage
-- Audit log created
-
----
-
-### 5. **updateRoom**
-Updates room details (owner only).
-
-**Usage:**
-```javascript
-const updateRoomFunc = httpsCallable(functions, 'updateRoom');
-
-const result = await updateRoomFunc({
-  roomId: "room123",
-  title: "Newly updated title",
-  price: "600"
-});
-console.log('Room updated');
-```
-
-**Allowed fields:**
-- title (5-100 chars)
-- location (non-empty)
-- price (0-1,000,000)
-
----
-
-### 6. **featureRoom** (Admin Only)
-Marks a room as featured (premium listing).
-
-**Usage:**
-```javascript
-const featureRoomFunc = httpsCallable(functions, 'featureRoom');
-
-const result = await featureRoomFunc({
-  roomId: "room123"
-});
-console.log('Room featured');
-```
-
-**Requirements:**
-- User must have `admin: true` custom claim
-
----
-
-### 7. **adminDeleteRoom** (Admin Only)
-Deletes any room with reason logging.
-
-**Usage:**
-```javascript
-const adminDeleteRoomFunc = httpsCallable(functions, 'adminDeleteRoom');
-
-const result = await adminDeleteRoomFunc({
-  roomId: "room123",
-  reason: "Inappropriate content"
-});
-console.log('Room deleted by admin');
-```
-
-**Logged in `auditLogs` collection:**
-- Admin ID
-- Reason for deletion
-- Original room data
-- Timestamp
-
----
-
-### 8. **getStatistics** (Admin Only)
-Gets app statistics.
-
-**Usage:**
-```javascript
-const getStatsFunc = httpsCallable(functions, 'getStatistics');
-
-const result = await getStatsFunc();
-console.log('Statistics:', result.data);
+{
+  location: "Harare",     // Optional
+  minPrice: 300,          // Optional
+  maxPrice: 1000          // Optional
+}
 ```
 
 **Returns:**
 ```javascript
 {
-  totalRooms: 150,
-  totalUsers: 320,
-  totalViews: 5000,
-  featuredRooms: 12,
-  storageUsage: "Check Firebase Console"
+  success: true,
+  rooms: [...],
+  count: 5
 }
 ```
 
 ---
 
-## Error Handling
+### 4. `deleteRoom`
+**Purpose:** Delete a room (owner only)
 
-All functions throw `HttpsError` with specific codes:
+**Called From:** "Delete" button on My Rooms tab
 
+**Parameters:**
 ```javascript
-try {
-  await createRoom({...});
-} catch (error) {
-  if (error.code === 'unauthenticated') {
-    console.log('User not logged in');
-  } else if (error.code === 'invalid-argument') {
-    console.log('Invalid input:', error.message);
-  } else if (error.code === 'permission-denied') {
-    console.log('Not authorized');
-  } else if (error.code === 'not-found') {
-    console.log('Room not found');
+{
+  roomId: "abc123"
+}
+```
+
+**Returns:**
+```javascript
+{
+  success: true,
+  message: "Room deleted successfully"
+}
+```
+
+**Security:**
+- Only room owner can delete
+- Automatically deletes image from storage
+- Logs action to database
+
+---
+
+### 5. `updateRoom`
+**Purpose:** Update room details (owner only)
+
+**Called From:** Edit room form (Phase 2)
+
+**Parameters:**
+```javascript
+{
+  roomId: "abc123",
+  updates: {
+    title: "New Title",
+    price: 600
+    // Other fields...
+  }
+}
+```
+
+**Returns:**
+```javascript
+{
+  success: true,
+  message: "Room updated successfully"
+}
+```
+
+---
+
+### 6. `featureRoom`
+**Purpose:** Feature/unfeature a room (admin only)
+
+**Called From:** Admin dashboard (Phase 2)
+
+**Parameters:**
+```javascript
+{
+  roomId: "abc123",
+  featured: true
+}
+```
+
+**Returns:**
+```javascript
+{
+  success: true,
+  message: "Room featured!"
+}
+```
+
+---
+
+### 7. `adminDeleteRoom`
+**Purpose:** Admin deletion with logging
+
+**Called From:** Admin dashboard (Phase 2)
+
+**Parameters:**
+```javascript
+{
+  roomId: "abc123",
+  reason: "Inappropriate content"
+}
+```
+
+**Returns:**
+```javascript
+{
+  success: true,
+  message: "Room deleted by admin"
+}
+```
+
+**Features:**
+- Logs deletion reason
+- Records original owner
+- Audit trail in logs collection
+
+---
+
+### 8. `getStatistics`
+**Purpose:** Get admin dashboard statistics
+
+**Called From:** Admin dashboard (Phase 2)
+
+**Parameters:** None
+
+**Returns:**
+```javascript
+{
+  success: true,
+  stats: {
+    totalRooms: 150,
+    totalUsers: 45,
+    totalActions: 890,
+    featuredRooms: 5,
+    avgPrice: 450.50
   }
 }
 ```
 
 ---
 
-## Deployment
+## Monitoring Functions
 
-### Deploy functions:
-```bash
-firebase deploy --only functions
-```
-
-### View logs:
+### View Logs
 ```bash
 firebase functions:log
 ```
 
-### Test locally:
+### Real-time Logs
 ```bash
-firebase emulators:start --only functions
+firebase functions:log --follow
+```
+
+### Firebase Console
+1. Go to Firebase Console
+2. Functions → Logs
+3. Filter by function name
+4. Check execution time, memory usage, errors
+
+---
+
+## Error Handling
+
+### Common Errors
+
+**`unauthenticated`**
+- User not signed in
+- Solution: Call `signIn()` first
+
+**`permission-denied`**
+- User doesn't own the resource
+- Solution: Only owners can modify their rooms
+
+**`invalid-argument`**
+- Validation failed
+- Solution: Check all required fields are valid
+
+**`internal`**
+- Server error
+- Solution: Check Firebase logs
+
+---
+
+## Usage Examples
+
+### From Frontend (JavaScript)
+
+```javascript
+// Get Firebase functions
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
+const functions = getFunctions();
+
+// Call a function
+const validateAndCreateRoom = httpsCallable(functions, 'validateAndCreateRoom');
+
+try {
+  const result = await validateAndCreateRoom({
+    title: "2-Bed Apartment",
+    location: "Harare",
+    price: 500,
+    phone: "+263771234567",
+    imageUrl: "gs://..."
+  });
+  console.log(result.data);
+} catch (error) {
+  console.error(error.message);
+}
 ```
 
 ---
 
-## Best Practices
+## Quotas & Limits
 
-1. **Always validate input** - Functions sanitize automatically
-2. **Check authentication** - All functions verify user is logged in
-3. **Verify ownership** - Can't delete/update other users' rooms
-4. **Log actions** - Audit trail for admin actions
-5. **Use try-catch** - Handle errors gracefully
-6. **Monitor logs** - Check `firebase functions:log` regularly
+- **Max request size:** 10MB
+- **Max response size:** 10MB
+- **Timeout:** 540 seconds
+- **Memory:** 256MB to 8GB
 
 ---
 
-## Performance Tips
+## Next Steps
 
-1. **Indexes** - Already configured in `firestore.indexes.json`
-2. **Query limits** - Functions limit results to 100 documents
-3. **Batch operations** - Use batch writes for multiple changes
-4. **Caching** - Results cached by Firebase automatically
+- Phase 2: Add user profile functions
+- Phase 3: Add payment processing
+- Phase 4: Add analytics functions
 
 ---
 
-## Cost Optimization
+## Support
 
-- Cloud Functions: ~$0.40/million invocations
-- Firestore: ~$0.06 per 100K reads, $0.18 per 100K writes
-- Storage: ~$0.020/GB/month
-
-Start free tier (2M function calls/month), upgrade as needed.
-
+For issues: Check Firebase Functions documentation
+- [https://firebase.google.com/docs/functions](https://firebase.google.com/docs/functions)
