@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rent Easy 🇿🇼</title>
+
+<style>
+body {font-family: Arial; margin:0; background:#f4f4f4;}
+header {background:#1e8449; color:white; padding:15px; text-align:center;}
+.container {max-width:900px; margin:auto; padding:15px;}
+
+.card {
+background:white; padding:15px; margin:10px 0;
+border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1);
+position:relative;
+}
+
+.featured {
+border:2px solid gold;
+}
+
+.badge {
+position:absolute;
+top:10px;
+right:10px;
+background:gold;
+paddingPadding:5px;
+font-size:12px;
+}
+
+input, button, textarea {
+width:100%; padding:10px; margin:5px 0; box-sizing:border-box;
+border: 1px solid #ddd; border-radius: 5px;
+}
+
+button {
+background:#1e8449;
+color:white;
+border:none;
+cursor:pointer;
+}
+
+button:hover {
+background:#145a35;
+}
+
+button.secondary {
+background:#6c757d;
+}
+
+button.secondary:hover {
+background:#5a6268;
+}
+
+img {width:100%; border-radius:8px; margin-top:10px; max-height:300px; object-fit:cover;}
+
+.auth-section {
+background:white; padding:15px; margin:10px 0; border-radius:10px; text-align:center;
+}
+
+.error {background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin:10px 0;}
+.success {background:#d4edda; color:#155724; padding:10px; border-radius:5px; margin:10px 0;}
+.loading {text-align:center; color:#1e8449;}
+
+.my-rooms {background:#e8f5e9; padding:10px; margin:10px 0; border-radius:5px;}
+
+.room-header {display:flex; justify-content:space-between; align-items:center;}
+
+.tab-buttons {display:flex; gap:10px; margin:10px 0;}
+.tab-buttons button {flex:1;}
+
+.section {display:none;}
+.section.active {display:block;}
+
+@media (max-width: 600px) {
+  .tab-buttons {flex-direction:column;}
+  input, button {font-size:16px;}
+}
+</style>
+
+</head>
+
+<body>
+
+<header>
+<h2>🏠 Rent Easy 🇿🇼</h2>
+<p>Find & post rooms easily</p>
+</header>
+
+<div class="container">
+
+<!-- Authentication Section -->
+<div class="auth-section">
+  <div id="authStatus"></div>
+  <button id="signOutBtn" onclick="signOut()" style="display:none;">Sign Out</button>
+</div>
+
+<!-- Messages -->
+<div id="message"></div>
+
+<!-- Tab Navigation -->
+<div class="tab-buttons">
+  <button onclick="showTab('browse')">🏠 Browse Rooms</button>
+  <button onclick="showTab('post')">➕ Post Room</button>
+  <button onclick="showTab('myrooms')">👤 My Rooms</button>
+</div>
+
+<!-- BROWSE TAB -->
+<div id="browse" class="section active">
+  <h3>📍 Available Rooms</h3>
+  
+  <!-- Search/Filter -->
+  <div style="background:white; padding:15px; border-radius:10px; margin-bottom:15px;">
+    <h4>🔍 Search Rooms</h4>
+    <input id="searchLocation" placeholder="Location (Harare, Bulawayo...)" onchange="filterRooms()">
+    <input id="searchMinPrice" type="number" placeholder="Min Price" onchange="filterRooms()">
+    <input id="searchMaxPrice" type="number" placeholder="Max Price" onchange="filterRooms()">
+    <button onclick="filterRooms()">Search</button>
+    <button class="secondary" onclick="clearSearch()">Clear Filters</button>
+  </div>
+  
+  <div id="rooms"></div>
+</div>
+
+<!-- POST ROOM TAB -->
+<div id="post" class="section">
+  <h3>➕ Post a New Room</h3>
+  
+  <div style="background:white; padding:15px; border-radius:10px;">
+    <input id="title" placeholder="Room title (e.g., 2-bed apartment)" maxlength="100">
+    <small>5-100 characters</small>
+    
+    <input id="location" placeholder="Location (Harare, Bulawayo, etc.)">
+    
+    <input id="price" type="number" placeholder="Price (per month)" min="0" max="1000000">
+    
+    <input id="phone" placeholder="WhatsApp (+263...)" pattern="^\+?[0-9]{10,15}$">
+    <small>10-15 digits, can include +</small>
+    
+    <label>Room Image (JPG, PNG, WebP - Max 5MB):</label>
+    <input type="file" id="image" accept="image/jpeg,image/png,image/webp">
+    
+    <button onclick="postRoom()">📤 Post Room</button>
+  </div>
+</div>
+
+<!-- MY ROOMS TAB -->
+<div id="myrooms" class="section">
+  <h3>👤 My Rooms</h3>
+  <div id="myRoomsList"></div>
+</div>
+
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  deleteDoc,
+  doc,
+  where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+import {
+  getAuth,
+  signInAnonymously,
+  signOut as firebaseSignOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+/* 🔥 FIREBASE CONFIG - Load from environment or hardcoded */
+const firebaseConfig = {
+  apiKey: "AIzaSyB0Qx...", // Replace with your config
+  authDomain: "rent-easy-zw.firebaseapp.com",
+  projectId: "rent-easy-zw",
+  storageBucket: "rent-easy-zw.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef123456"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
+
+/* GLOBAL STATE */
+let currentUser = null;
+let allRooms = [];
+
+/* ============== AUTHENTICATION ============== */
+
+window.showTab = function(tab) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(tab).classList.add('active');
+  
+  if (tab === 'myrooms' && currentUser) {
+    loadUserRooms();
+  }
+};
+
+window.signOut = async function() {
+  try {
+    await firebaseSignOut(auth);
+    showMessage('Signed out', 'success');
+  } catch (error) {
+    showMessage('Error signing out: ' + error.message, 'error');
+  }
+};
+
+function showMessage(text, type = 'error') {
+  const msg = document.getElementById('message');
+  msg.innerHTML = `<div class="${type}">${text}</div>`;
+  setTimeout(() => msg.innerHTML = '', 5000);
+}
+
+// Monitor authentication
+onAuthStateChanged(auth, (user) => {
+  const authStatus = document.getElementById('authStatus');
+  const signOutBtn = document.getElementById('signOutBtn');
+  
+  if (user) {
+    currentUser = user;
+    authStatus.innerHTML = `<p>✅ Signed in as Anonymous User (${user.uid.substring(0, 8)}...)</p>`;
+    signOutBtn.style.display = 'block';
+    loadAllRooms();
+  } else {
+    currentUser = null;
+    authStatus.innerHTML = `<button onclick="signInAnon()">🔓 Sign In to Post Rooms</button>`;
+    signOutBtn.style.display = 'none';
+  }
+});
+
+window.signInAnon = async function() {
+  try {
+    await signInAnonymously(auth);
+    showMessage('Signed in!', 'success');
+  } catch (error) {
+    showMessage('Error: ' + error.message, 'error');
+  }
+};
+
+/* ============== IMAGE UPLOAD ============== */
+
+async function uploadImage(file) {
+  if (!file) return "";
+  
+  // Validate file
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    throw new Error('Only JPEG, PNG, and WebP images allowed');
+  }
+  
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('File must be under 5MB');
+  }
+  
+  // Generate unique filename
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  const filename = `${currentUser.uid}_${timestamp}_${random}.${file.name.split('.').pop()}`;
+  
+  const imgRef = ref(storage, "rooms/" + filename);
+  await uploadBytes(imgRef, file);
+  return await getDownloadURL(imgRef);
+}
+
+/* ============== ROOM MANAGEMENT ============== */
+
+window.postRoom = async function() {
+  if (!currentUser) {
+    showMessage('Please sign in first', 'error');
+    return;
+  }
+  
+  const title = document.getElementById('title').value.trim();
+  const location = document.getElementById('location').value.trim();
+  const price = document.getElementById('price').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const file = document.getElementById('image').files[0];
+  
+  // Validate
+  if (!title || title.length < 5 || title.length > 100) {
+    showMessage('Title must be 5-100 characters', 'error');
+    return;
+  }
+  
+  if (!location) {
+    showMessage('Location is required', 'error');
+    return;
+  }
+  
+  if (!price || parseInt(price) < 0 || parseInt(price) > 1000000) {
+    showMessage('Enter a valid price', 'error');
+    return;
+  }
+  
+  if (!phone || !/^\+?[0-9]{10,15}$/.test(phone.replace(/[\s-()]/g, ''))) {
+    showMessage('Enter a valid phone number', 'error');
+    return;
+  }
+  
+  if (!file) {
+    showMessage('Please select an image', 'error');
+    return;
+  }
+  
+  try {
+    // Upload image
+    const imageUrl = await uploadImage(file);
+    
+    // Add to Firestore
+    await addDoc(collection(db, "rooms"), {
+      title: sanitizeString(title),
+      location: sanitizeString(location),
+      price: price,
+      phone: phone,
+      imageUrl: imageUrl,
+      userId: currentUser.uid,
+      featured: false,
+      views: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    // Reset form
+    document.getElementById('title').value = '';
+    document.getElementById('location').value = '';
+    document.getElementById('price').value = '';
+    document.getElementById('phone').value = '';
+    document.getElementById('image').value = '';
+    
+    showMessage('✅ Room posted successfully!', 'success');
+    showTab('browse');
+  } catch (error) {
+    showMessage('Error posting room: ' + error.message, 'error');
+  }
+};
+
+/* ============== LOAD ROOMS ============== */
+
+function loadAllRooms() {
+  const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
+  
+  onSnapshot(q, (snapshot) => {
+    allRooms = [];
+    
+    snapshot.forEach((d) => {
+      const r = d.data();
+      allRooms.push({
+        id: d.id,
+        ...r
+      });
+    });
+    
+    displayRooms(allRooms);
+  });
+}
+
+function displayRooms(rooms) {
+  let html = '';
+  
+  if (rooms.length === 0) {
+    html = '<p style="text-align:center; color:#666;">No rooms found. Be the first to post!</p>';
+  }
+  
+  rooms.forEach((r) => {
+    const date = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+    const isOwner = currentUser && r.userId === currentUser.uid;
+    
+    html += `
+    <div class="card ${r.featured ? "featured" : ""}">
+      ${r.featured ? '<div class="badge">⭐ FEATURED</div>' : ""}
+      
+      <div class="room-header">
+        <h3>${escapeHtml(r.title)}</h3>
+        ${isOwner ? '<button class="secondary" onclick="deleteRoom(\'${r.id}\')">🗑 Delete</button>' : ''}
+      </div>
+      
+      <p>📍 ${escapeHtml(r.location)}</p>
+      <p>💰 $${r.price}</p>
+      <p style="color:#999; font-size:12px;">Posted: ${date}</p>
+      
+      ${r.imageUrl ? `<img src="${r.imageUrl}" alt="${escapeHtml(r.title)}"/>` : ""}
+      
+      <a href="https://wa.me/${r.phone.replace(/[^0-9]/g, '')}" target="_blank">
+        <button>📞 Contact Owner via WhatsApp</button>
+      </a>
+    </div>`;
+  });
+  
+  document.getElementById('rooms').innerHTML = html;
+}
+
+window.filterRooms = function() {
+  const location = document.getElementById('searchLocation').value.toLowerCase();
+  const minPrice = parseInt(document.getElementById('searchMinPrice').value) || 0;
+  const maxPrice = parseInt(document.getElementById('searchMaxPrice').value) || 999999;
+  
+  const filtered = allRooms.filter(r => {
+    const matchLocation = !location || r.location.toLowerCase().includes(location);
+    const matchPrice = parseInt(r.price) >= minPrice && parseInt(r.price) <= maxPrice;
+    return matchLocation && matchPrice;
+  });
+  
+  displayRooms(filtered);
+};
+
+window.clearSearch = function() {
+  document.getElementById('searchLocation').value = '';
+  document.getElementById('searchMinPrice').value = '';
+  document.getElementById('searchMaxPrice').value = '';
+  displayRooms(allRooms);
+};
+
+function loadUserRooms() {
+  if (!currentUser) return;
+  
+  const q = query(
+    collection(db, "rooms"),
+    where("userId", "==", currentUser.uid),
+    orderBy("createdAt", "desc")
+  );
+  
+  onSnapshot(q, (snapshot) => {
+    let html = '';
+    
+    if (snapshot.empty) {
+      html = '<p style="text-align:center;">You haven\'t posted any rooms yet.</p>';
+    }
+    
+    snapshot.forEach((d) => {
+      const r = d.data();
+      const date = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+      
+      html += `
+      <div class="card my-rooms">
+        <div class="room-header">
+          <h4>${escapeHtml(r.title)}</h4>
+          <div>
+            <button class="secondary" onclick="editRoom(\'${d.id}\')">✏️ Edit</button>
+            <button class="secondary" onclick="deleteRoom(\'${d.id}\')">🗑 Delete</button>
+          </div>
+        </div>
+        <p>📍 ${escapeHtml(r.location)} | 💰 $${r.price}</p>
+        <p style="color:#999; font-size:12px;">Posted: ${date} | Views: ${r.views || 0}</p>
+        ${r.imageUrl ? `<img src="${r.imageUrl}" alt="${escapeHtml(r.title)}" style="max-height:200px;"/>` : ""}
+      </div>`;
+    });
+    
+    document.getElementById('myRoomsList').innerHTML = html;
+  });
+}
+
+window.deleteRoom = async function(id) {
+  if (!confirm('Are you sure you want to delete this room?')) return;
+  
+  try {
+    await deleteDoc(doc(db, "rooms", id));
+    showMessage('✅ Room deleted', 'success');
+  } catch (error) {
+    showMessage('Error deleting room: ' + error.message, 'error');
+  }
+};
+
+/* ============== UTILITY FUNCTIONS ============== */
+
+function sanitizeString(str) {
+  return str.replace(/[<>"']/g, (char) => {
+    const entities = {'<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;'};
+    return entities[char];
+  }).substring(0, 500);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+</script>
+
+</body>
+</html>

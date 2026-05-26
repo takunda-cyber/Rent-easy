@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isValidImage() {
+      return request.resource.size <= 5 * 1024 * 1024 && // 5MB max
+             request.resource.contentType in [
+               'image/jpeg',
+               'image/png',
+               'image/webp'
+             ];
+    }
+    
+    // Room images
+    match /rooms/{allPaths=**} {
+      // Anyone can read (public images)
+      allow read: if true;
+      
+      // Only authenticated users can upload
+      allow write: if isAuthenticated() &&
+                      isValidImage() &&
+                      resource == null; // Don't allow overwrites
+      
+      // Only original uploader can delete
+      allow delete: if isAuthenticated() &&
+                       request.auth.uid == resource.metadata.firebaseStorageDownloadTokens;
+    }
+    
+    // User avatars
+    match /users/{userId}/avatar.{ext} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+                      request.auth.uid == userId &&
+                      isValidImage();
+    }
+  }
+}
