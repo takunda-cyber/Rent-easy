@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Rent Easy 🇿🇼</title>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; color: #333; line-height: 1.6; }
+
+header {
+background: #1e8449;
+color: white;
+padding: 25px 15px;
+text-align: center;
+box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+header h2 { font-size: 2rem; margin-bottom: 5px; }
+header p { font-size: 1rem; opacity: 0.9; }
+
+.container { max-width: 1000px; margin: auto; padding: 20px; }
+
+.panel-card {
+background: white;
+padding: 25px;
+border-radius: 12px;
+margin-bottom: 25px;
+box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.auth-status { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.user-id-badge { background: #e8f5e9; color: #1e8449; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; display: inline-block; margin-bottom: 15px; }
+
+.filter-grid {
+background: #e8f5e9;
+padding: 20px;
+border-radius: 10px;
+margin-bottom: 25px;
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+gap: 15px;
+align-items: end;
+}
+
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: 600; color: #444; font-size: 0.9rem; }
+
+input, textarea, select {
+width: 100%;
+padding: 12px;
+border: 1px solid #ccc;
+border-radius: 6px;
+font-size: 0.95rem;
+background: #fff;
+transition: border-color 0.2s;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: #1e8449; }
+
+button {
+background: #1e8449;
+color: white;
+border: none;
+padding: 12px 20px;
+border-radius: 6px;
+cursor: pointer;
+font-weight: bold;
+font-size: 0.95rem;
+transition: background 0.2s, transform 0.1s;
+}
+button:hover { background: #145a32; }
+button:active { transform: scale(0.98); }
+button:disabled { background: #bdc3c7; cursor: not-allowed; transform: none; }
+
+button.btn-danger { background: #c62828; }
+button.btn-danger:hover { background: #b71c1c; }
+button.btn-secondary { background: #7f8c8d; }
+button.btn-secondary:hover { background: #626567; }
+
+h3 { color: #1e8449; margin-bottom: 15px; font-size: 1.4rem; border-bottom: 2px solid #e8f5e9; padding-bottom: 5px; }
+
+.rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+
+.card {
+background: white;
+border-radius: 12px;
+overflow: hidden;
+box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+position: relative;
+transition: transform 0.2s, box-shadow 0.2s;
+border: 1px solid #eef2f1;
+}
+.card:hover { transform: translateY(-4px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+.card.featured { border: 2px solid #f1c40f; }
+
+.featured-badge {
+position: absolute;
+top: 12px;
+right: 12px;
+background: #f1c40f;
+color: #333;
+padding: 4px 10px;
+font-size: 0.75rem;
+font-weight: bold;
+border-radius: 20px;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+z-index: 2;
+}
+
+.card-content { padding: 18px; }
+.card-title { font-size: 1.2rem; font-weight: bold; color: #2c3e50; margin-bottom: 8px; }
+.card-meta { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.card-price { font-size: 1.3rem; font-weight: 700; color: #27ae60; margin: 10px 0; }
+
+.card-img {
+width: 100%;
+height: 200px;
+object-fit: cover;
+border-bottom: 1px solid #eee;
+}
+
+.card-actions { padding: 0 18px 18px 18px; display: flex; gap: 10px; }
+.card-actions a, .card-actions button { flex: 1; text-decoration: none; }
+.card-actions button { width: 100%; padding: 10px; font-size: 0.9rem; }
+
+.hidden { display: none; }
+.empty-state { text-align: center; padding: 40px; color: #7f8c8d; grid-column: 1 / -1; font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<header>
+<h2>🏠 Rent Easy 🇿🇼</h2>
+<p>Secure Room Rental Marketplace</p>
+</header>
+
+<div class="container">
+<div class="panel-card">
+<div id="authStatus" class="auth-status">🔒 Verification Checking...</div>
+<div id="userInfoSection" class="hidden">
+<span id="userIdDisplay" class="user-id-badge"></span>
+</div>
+<div id="authActionArea"></div>
+</div>
+
+<div id="protectedPlatformView" class="hidden">
+
+<h3>🔍 Search Available Listings</h3>
+<div class="filter-grid">
+<div class="form-group">
+<label for="filterLocation">Location City</label>
+<select id="filterLocation">
+<option value="">All Locations</option>
+<option value="Harare">Harare</option>
+<option value="Bulawayo">Bulawayo</option>
+<option value="Mutare">Mutare</option>
+<option value="Gweru">Gweru</option>
+<option value="Masvingo">Masvingo</option>
+</select>
+</div>
+<div class="form-group">
+<label for="filterMinPrice">Minimum Price (USD)</label>
+<input type="number" id="filterMinPrice" placeholder="Min">
+</div>
+<div class="form-group">
+<label for="sortBy">Ordering Priority</label>
+<select id="sortBy">
+<option value="newest">Newest Listed</option>
+<option value="cheapest">Price: Low to High</option>
+<option value="expensive">Price: High to Low</option>
+</select>
+</div>
+</div>
+
+<h3>📍 Active Marketplace Items</h3>
+<div id="roomsGrid" class="rooms-grid"></div>
+
+<h3 style="margin-top: 40px;">➕ Post a New Room Listing</h3>
+<div class="panel-card">
+<div class="form-group">
+<label for="title">Room / Property Title *</label>
+<input type="text" id="title" placeholder="e.g., Spacious Avondale Cottage Room" required>
+</div>
+<div class="form-group">
+<label for="location">Location City *</label>
+<select id="location" required>
+<option value="">Select location...</option>
+<option value="Harare">Harare</option>
+<option value="Bulawayo">Bulawayo</option>
+<option value="Mutare">Mutare</option>
+<option value="Gweru">Gweru</option>
+<option value="Masvingo">Masvingo</option>
+</select>
+</div>
+<div class="form-group">
+<label for="price">Monthly Price (USD $) *</label>
+<input type="number" id="price" placeholder="e.g., 150" required>
+</div>
+<div class="form-group">
+<label for="phone">WhatsApp Contact Number *</label>
+<input type="tel" id="phone" placeholder="e.g., +263771234567" required>
+</div>
+<div class="form-group">
+<label for="image">Property Presentation Image *</label>
+<input type="file" id="image" accept="image/*" required>
+</div>
+<button onclick="handlePostSubmission()" id="submitBtn" style="width: 100%; margin-top: 10px;">Publish Property Listing</button>
+</div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+// Dynamic configuration variables populated from runtime env injections
+const firebaseConfig = {
+apiKey: "YOUR_API_KEY",
+authDomain: "YOUR_AUTH_DOMAIN",
+projectId: "YOUR_PROJECT_ID",
+storageBucket: "YOUR_STORAGE_BUCKET",
+messagingSenderId: "YOUR_SENDER_ID",
+appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+let marketplaceCache = [];
+
+// State authentication state mutations engine listener
+onAuthStateChanged(auth, (user) => {
+const authStatus = document.getElementById("authStatus");
+const userInfoSection = document.getElementById("userInfoSection");
+const userIdDisplay = document.getElementById("userIdDisplay");
+const authActionArea = document.getElementById("authActionArea");
+const protectedPlatformView = document.getElementById("protectedPlatformView");
+
+if (user) {
+authStatus.textContent = "✅ Platform Authenticated Securely";
+userIdDisplay.textContent = `User Session: ${user.uid.substring(0, 12)}...`;
+userInfoSection.classList.remove("hidden");
+authActionArea.innerHTML = `<button class="btn-secondary" id="logoutBtn">Secure Sign Out</button>`;
+protectedPlatformView.classList.remove("hidden");
+
+document.getElementById("logoutBtn").addEventListener("click", triggerSignOut);
+initializeMarketplaceFeed();
+} else {
+authStatus.textContent = "❌ Authentication Token Missing";
+userInfoSection.classList.add("hidden");
+authActionArea.innerHTML = `<button id="loginBtn">Initialize Anonymous Session</button>`;
+protectedPlatformView.classList.add("hidden");
+
+document.getElementById("loginBtn").addEventListener("click", triggerSignIn);
+}
+});
+
+async function triggerSignIn() {
+try { await signInAnonymously(auth); } catch (e) { alert("Initialization Fault: " + e.message); }
+}
+async function triggerSignOut() {
+try { await signOut(auth); } catch (e) { alert("Termination Fault: " + e.message); }
+}
+
+async function runBinaryAssetUpload(file, uid) {
+if (!file) throw new Error("A valid image attachment is required.");
+if (file.size > 5 * 1024 * 1024) throw new Error("Asset boundaries restricted to 5MB capacity sizes.");
+
+const fileExtension = file.name.split('.').pop();
+const securePath = `rooms/${uid}/${Date.now()}_upload.${fileExtension}`;
+const assetRef = ref(storage, securePath);
+
+await uploadBytes(assetRef, file);
+return await getDownloadURL(assetRef);
+}
+
+window.handlePostSubmission = async () => {
+const btn = document.getElementById("submitBtn");
+try {
+btn.disabled = true;
+btn.innerText = "Processing Assets & Documents...";
+
+const title = document.getElementById("title").value.trim();
+const location = document.getElementById("location").value;
+const price = parseFloat(document.getElementById("price").value);
+const phone = document.getElementById("phone").value.trim();
+const fileElement = document.getElementById("image").files[0];
+
+if (title.length < 5 || title.length > 100) throw new Error("Title length must sit within 5 - 100 character sets.");
+if (isNaN(price) || price < 0) throw new Error("Price constraints must identify as positive numeric metrics.");
+if (!phone.startsWith("+")) throw new Error("Contact formats must implement correct standard international prefixes (+263...)");
+if (!fileElement) throw new Error("Please select a presentation graphic metadata image file.");
+
+const downloadUrl = await runBinaryAssetUpload(fileElement, auth.currentUser.uid);
+
+await addDoc(collection(db, "rooms"), {
+title,
+location,
+price,
+phone,
+imageUrl: downloadUrl,
+userId: auth.currentUser.uid,
+featured: false,
+createdAt: Date.now()
+});
+
+alert("Property listing published successfully! ✅");
+resetFormFields();
+} catch (error) {
+alert("Database Rejected Record: " + error.message);
+} finally {
+btn.disabled = false;
+btn.innerText = "Publish Property Listing";
+}
+};
+
+function resetFormFields() {
+document.getElementById("title").value = "";
+document.getElementById("location").value = "";
+document.getElementById("price").value = "";
+document.getElementById("phone").value = "";
+document.getElementById("image").value = "";
+}
+
+function initializeMarketplaceFeed() {
+const queryPipeline = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
+onSnapshot(queryPipeline, (snapshot) => {
+marketplaceCache = snapshot.docs.map(docRef => ({ id: docRef.id, ...docRef.data() }));
+renderPlatformView();
+});
+}
+
+function renderPlatformView() {
+const selectedLoc = document.getElementById("filterLocation").value;
+const minPrice = parseFloat(document.getElementById("filterMinPrice").value) || 0;
+const sortingStrategy = document.getElementById("sortBy").value;
+
+let workingDataset = marketplaceCache.filter(item => {
+const matchLoc = !selectedLoc || item.location === selectedLoc;
+const matchPrice = item.price >= minPrice;
+return matchLoc && matchPrice;
+});
+
+if (sortingStrategy === "cheapest") workingDataset.sort((a, b) => a.price - b.price);
+else if (sortingStrategy === "expensive") workingDataset.sort((a, b) => b.price - a.price);
+
+const targetGrid = document.getElementById("roomsGrid");
+if (workingDataset.length === 0) {
+targetGrid.innerHTML = `<div class="empty-state">No matching room listings match your exact parameter limits at this moment.</div>`;
+return;
+}
+
+let dynamicHtml = "";
+workingDataset.forEach(room => {
+const ownershipClaims = auth.currentUser && auth.currentUser.uid === room.userId;
+const whatsappLink = `https://wa.me/${room.phone.replace(/[^0-9]/g, '')}?text=Hi%2C%20I'm%20interested%20in%20${encodeURIComponent(room.title)}`;
+
+dynamicHtml += `<div class="card ${room.featured ? 'featured' : ''}">
+${room.featured ? '<div class="featured-badge">⭐ Featured</div>' : ''}
+${room.imageUrl ? `<img src="${room.imageUrl}" class="card-img" alt="Property Room Display" loading="lazy" />` : ''}
+<div class="card-content">
+<div class="card-title">${escapeHTML(room.title)}</div>
+<div class="card-meta">📍 ${escapeHTML(room.location)}</div>
+<div class="card-price">$${room.price.toFixed(2)} <span style="font-size:0.85rem; font-weight:normal; color:#7f8c8d;">/ month</span></div>
+</div>
+<div class="card-actions">
+<a href="${whatsappLink}" target="_blank" style="padding: 10px; background: #25d366; color: white; text-align: center; border-radius: 6px; text-decoration: none; font-weight: bold;">💬 Contact</a>
+${ownershipClaims ? `<button class="btn-danger" data-id="${room.id}">🗑️ Delete</button>` : ''}
+</div>
+</div>`;
+});
+
+targetGrid.innerHTML = dynamicHtml;
+
+// Attaching transactional dynamic garbage clearing routines onto active element trees
+targetGrid.querySelectorAll(".btn-danger").forEach(deleteBtn => {
+deleteBtn.addEventListener("click", (e) => {
+const targetId = e.target.getAttribute("data-id");
+executeListingRemoval(targetId);
+});
+});
+}
+
+async function executeListingRemoval(id) {
+if (confirm("Are you sure you want to completely remove this listing from the network?")) {
+try {
+await deleteDoc(doc(db, "rooms", id));
+alert("Listing dropped effectively.");
+} catch (err) {
+alert("Action Refused: " + err.message);
+}
+}
+}
+
+function escapeHTML(string) {
+const element = document.createElement('div');
+element.textContent = string;
+return element.innerHTML;
+}
+
+// Attach reactive input processing registers onto individual filter elements
+['filterLocation', 'filterMinPrice', 'sortBy'].forEach(elementId => {
+const element = document.getElementById(elementId);
+if (element) {
+element.addEventListener('change', renderPlatformView);
+element.addEventListener('input', renderPlatformView);
+}
+});
+</script>
+</body>
+</html>
