@@ -21,7 +21,35 @@ box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 header h2 { font-size: 2rem; margin-bottom: 5px; }
 header p { font-size: 1rem; opacity: 0.9; }
 
+nav {
+background: #145a32;
+padding: 0;
+box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+display: flex;
+justify-content: center;
+flex-wrap: wrap;
+gap: 0;
+}
+
+nav button {
+background: none;
+border: none;
+color: white;
+padding: 15px 25px;
+cursor: pointer;
+font-weight: 600;
+font-size: 1rem;
+transition: background 0.3s, border-bottom 0.3s;
+border-bottom: 3px solid transparent;
+}
+
+nav button:hover { background: #1e8449; }
+nav button.active { background: #1e8449; border-bottom-color: #f1c40f; }
+
 .container { max-width: 1000px; margin: auto; padding: 20px; }
+
+.page { display: none; }
+.page.active { display: block; }
 
 .panel-card {
 background: white;
@@ -78,6 +106,7 @@ button.btn-danger { background: #c62828; }
 button.btn-danger:hover { background: #b71c1c; }
 button.btn-secondary { background: #7f8c8d; }
 button.btn-secondary:hover { background: #626567; }
+button.btn-primary { background: #1e8449; }
 
 h3 { color: #1e8449; margin-bottom: 15px; font-size: 1.4rem; border-bottom: 2px solid #e8f5e9; padding-bottom: 5px; }
 
@@ -130,6 +159,73 @@ border-bottom: 1px solid #eee;
 
 .hidden { display: none; }
 .empty-state { text-align: center; padding: 40px; color: #7f8c8d; grid-column: 1 / -1; font-size: 1.1rem; }
+
+.my-listings-item {
+background: white;
+padding: 20px;
+border-radius: 8px;
+margin-bottom: 15px;
+border-left: 4px solid #1e8449;
+box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+.my-listings-info { flex: 1; }
+.my-listings-info h4 { color: #2c3e50; margin-bottom: 5px; }
+.my-listings-info p { color: #7f8c8d; font-size: 0.9rem; margin: 3px 0; }
+
+.my-listings-actions { display: flex; gap: 10px; }
+.my-listings-actions button { padding: 8px 15px; font-size: 0.85rem; }
+
+.login-container {
+text-align: center;
+padding: 60px 20px;
+}
+
+.login-container h1 { color: #1e8449; margin-bottom: 20px; font-size: 2.5rem; }
+.login-container p { color: #7f8c8d; font-size: 1.1rem; margin-bottom: 30px; }
+.login-container button { padding: 15px 40px; font-size: 1.1rem; }
+
+.about-content {
+line-height: 1.8;
+}
+
+.about-content h4 { color: #1e8449; margin-top: 20px; margin-bottom: 10px; }
+.about-content p { margin-bottom: 15px; }
+.about-content ul { margin-left: 20px; margin-bottom: 15px; }
+.about-content li { margin-bottom: 8px; }
+
+.stats-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+gap: 20px;
+margin-bottom: 30px;
+}
+
+.stat-card {
+background: linear-gradient(135deg, #1e8449 0%, #145a32 100%);
+color: white;
+padding: 25px;
+border-radius: 12px;
+text-align: center;
+box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.stat-card .number { font-size: 2.5rem; font-weight: bold; }
+.stat-card .label { font-size: 0.95rem; opacity: 0.9; }
+
+.auth-section {
+display: flex;
+gap: 15px;
+align-items: center;
+}
+
+.auth-section button {
+padding: 8px 15px;
+font-size: 0.9rem;
+}
 </style>
 </head>
 <body>
@@ -139,17 +235,33 @@ border-bottom: 1px solid #eee;
 <p>Secure Room Rental Marketplace</p>
 </header>
 
+<nav id="mainNav"></nav>
+
 <div class="container">
+<!-- Auth Panel -->
 <div class="panel-card">
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<div>
 <div id="authStatus" class="auth-status">🔒 Verification Checking...</div>
 <div id="userInfoSection" class="hidden">
 <span id="userIdDisplay" class="user-id-badge"></span>
 </div>
+</div>
 <div id="authActionArea"></div>
 </div>
+</div>
 
-<div id="protectedPlatformView" class="hidden">
+<!-- LOGIN PAGE -->
+<div id="loginPage" class="page">
+<div class="login-container">
+<h1>🔑 Welcome to Rent Easy</h1>
+<p>Sign in to browse and post room listings</p>
+<button id="loginBtn" onclick="triggerSignIn()">Initialize Anonymous Session</button>
+</div>
+</div>
 
+<!-- BROWSE PAGE -->
+<div id="browsePage" class="page">
 <h3>🔍 Search Available Listings</h3>
 <div class="filter-grid">
 <div class="form-group">
@@ -179,8 +291,11 @@ border-bottom: 1px solid #eee;
 
 <h3>📍 Active Marketplace Items</h3>
 <div id="roomsGrid" class="rooms-grid"></div>
+</div>
 
-<h3 style="margin-top: 40px;">➕ Post a New Room Listing</h3>
+<!-- POST PAGE -->
+<div id="postPage" class="page">
+<h3>➕ Post a New Room Listing</h3>
 <div class="panel-card">
 <div class="form-group">
 <label for="title">Room / Property Title *</label>
@@ -212,6 +327,58 @@ border-bottom: 1px solid #eee;
 <button onclick="handlePostSubmission()" id="submitBtn" style="width: 100%; margin-top: 10px;">Publish Property Listing</button>
 </div>
 </div>
+
+<!-- MY LISTINGS PAGE -->
+<div id="myListingsPage" class="page">
+<h3>📋 My Active Listings</h3>
+<div id="myListingsContainer"></div>
+</div>
+
+<!-- ABOUT PAGE -->
+<div id="aboutPage" class="page">
+<div class="panel-card">
+<h3>ℹ️ About Rent Easy</h3>
+<div class="about-content">
+<p>Rent Easy is a secure, user-friendly room rental marketplace designed for Zimbabwe. Our platform connects landlords and renters with a simple, transparent interface.</p>
+
+<h4>🎯 Our Mission</h4>
+<p>To make room rental in Zimbabwe easy, safe, and transparent for everyone.</p>
+
+<h4>✨ Key Features</h4>
+<ul>
+<li>📱 Browse listings across major Zimbabwean cities</li>
+<li>🔐 Secure anonymous authentication</li>
+<li>💬 Direct WhatsApp contact with landlords</li>
+<li>🖼️ High-quality property images</li>
+<li>🏷️ Transparent pricing</li>
+<li>📝 Easy listing management</li>
+</ul>
+
+<h4>🌍 Coverage Areas</h4>
+<ul>
+<li>Harare - Capital city listings</li>
+<li>Bulawayo - Second largest city</li>
+<li>Mutare - Eastern region</li>
+<li>Gweru - Central region</li>
+<li>Masvingo - Southern region</li>
+</ul>
+
+<h4>💡 How It Works</h4>
+<ol style="margin-left: 20px;">
+<li>Create an anonymous account</li>
+<li>Browse available listings or post your own</li>
+<li>Contact landlords directly via WhatsApp</li>
+<li>Arrange viewings and finalize rentals</li>
+</ol>
+
+<h4>🤝 Support</h4>
+<p>Have questions? Contact us through the WhatsApp links on individual listings or reach out to our support team.</p>
+
+<h4>📜 Terms & Conditions</h4>
+<p>By using Rent Easy, you agree to conduct all transactions responsibly and verify property details before committing to a rental agreement.</p>
+</div>
+</div>
+</div>
 </div>
 
 <script type="module">
@@ -220,7 +387,6 @@ import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https:/
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-// Dynamic configuration variables populated from runtime env injections
 const firebaseConfig = {
 apiKey: "YOUR_API_KEY",
 authDomain: "YOUR_AUTH_DOMAIN",
@@ -236,40 +402,84 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 let marketplaceCache = [];
+let currentUser = null;
 
-// State authentication state mutations engine listener
+const pages = {
+login: document.getElementById("loginPage"),
+browse: document.getElementById("browsePage"),
+post: document.getElementById("postPage"),
+myListings: document.getElementById("myListingsPage"),
+about: document.getElementById("aboutPage")
+};
+
+const nav = document.getElementById("mainNav");
+
+function showPage(pageName) {
+Object.values(pages).forEach(page => page.classList.remove("active"));
+pages[pageName].classList.add("active");
+
+// Update nav buttons
+document.querySelectorAll("nav button").forEach(btn => {
+btn.classList.remove("active");
+if (btn.dataset.page === pageName) btn.classList.add("active");
+});
+}
+
+function buildNav(isLoggedIn) {
+nav.innerHTML = "";
+
+if (isLoggedIn) {
+const navItems = [
+{ page: "browse", label: "🔍 Browse" },
+{ page: "post", label: "➕ Post Listing" },
+{ page: "myListings", label: "📋 My Listings" },
+{ page: "about", label: "ℹ️ About" }
+];
+
+navItems.forEach(item => {
+const btn = document.createElement("button");
+btn.textContent = item.label;
+btn.dataset.page = item.page;
+btn.addEventListener("click", () => showPage(item.page));
+nav.appendChild(btn);
+});
+}
+}
+
 onAuthStateChanged(auth, (user) => {
 const authStatus = document.getElementById("authStatus");
 const userInfoSection = document.getElementById("userInfoSection");
 const userIdDisplay = document.getElementById("userIdDisplay");
 const authActionArea = document.getElementById("authActionArea");
-const protectedPlatformView = document.getElementById("protectedPlatformView");
 
 if (user) {
+currentUser = user;
 authStatus.textContent = "✅ Platform Authenticated Securely";
 userIdDisplay.textContent = `User Session: ${user.uid.substring(0, 12)}...`;
 userInfoSection.classList.remove("hidden");
-authActionArea.innerHTML = `<button class="btn-secondary" id="logoutBtn">Secure Sign Out</button>`;
-protectedPlatformView.classList.remove("hidden");
+authActionArea.innerHTML = `<button class="btn-secondary" onclick="triggerSignOut()">🚪 Sign Out</button>`;
 
-document.getElementById("logoutBtn").addEventListener("click", triggerSignOut);
+buildNav(true);
 initializeMarketplaceFeed();
+showPage("browse");
 } else {
+currentUser = null;
 authStatus.textContent = "❌ Authentication Token Missing";
 userInfoSection.classList.add("hidden");
-authActionArea.innerHTML = `<button id="loginBtn">Initialize Anonymous Session</button>`;
-protectedPlatformView.classList.add("hidden");
+authActionArea.innerHTML = `<button id="loginBtn" onclick="triggerSignIn()">Initialize Anonymous Session</button>`;
 
-document.getElementById("loginBtn").addEventListener("click", triggerSignIn);
+buildNav(false);
+showPage("login");
 }
 });
 
-async function triggerSignIn() {
+window.triggerSignIn = async () => {
 try { await signInAnonymously(auth); } catch (e) { alert("Initialization Fault: " + e.message); }
-}
-async function triggerSignOut() {
+};
+
+window.triggerSignOut = async () => {
 try { await signOut(auth); } catch (e) { alert("Termination Fault: " + e.message); }
-}
+};
 
 async function runBinaryAssetUpload(file, uid) {
 if (!file) throw new Error("A valid image attachment is required.");
@@ -300,7 +510,7 @@ if (isNaN(price) || price < 0) throw new Error("Price constraints must identify 
 if (!phone.startsWith("+")) throw new Error("Contact formats must implement correct standard international prefixes (+263...)");
 if (!fileElement) throw new Error("Please select a presentation graphic metadata image file.");
 
-const downloadUrl = await runBinaryAssetUpload(fileElement, auth.currentUser.uid);
+const downloadUrl = await runBinaryAssetUpload(fileElement, currentUser.uid);
 
 await addDoc(collection(db, "rooms"), {
 title,
@@ -308,13 +518,14 @@ location,
 price,
 phone,
 imageUrl: downloadUrl,
-userId: auth.currentUser.uid,
+userId: currentUser.uid,
 featured: false,
 createdAt: Date.now()
 });
 
 alert("Property listing published successfully! ✅");
 resetFormFields();
+showPage("myListings");
 } catch (error) {
 alert("Database Rejected Record: " + error.message);
 } finally {
@@ -335,11 +546,12 @@ function initializeMarketplaceFeed() {
 const queryPipeline = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
 onSnapshot(queryPipeline, (snapshot) => {
 marketplaceCache = snapshot.docs.map(docRef => ({ id: docRef.id, ...docRef.data() }));
-renderPlatformView();
+renderBrowsePage();
+renderMyListingsPage();
 });
 }
 
-function renderPlatformView() {
+function renderBrowsePage() {
 const selectedLoc = document.getElementById("filterLocation").value;
 const minPrice = parseFloat(document.getElementById("filterMinPrice").value) || 0;
 const sortingStrategy = document.getElementById("sortBy").value;
@@ -361,7 +573,6 @@ return;
 
 let dynamicHtml = "";
 workingDataset.forEach(room => {
-const ownershipClaims = auth.currentUser && auth.currentUser.uid === room.userId;
 const whatsappLink = `https://wa.me/${room.phone.replace(/[^0-9]/g, '')}?text=Hi%2C%20I'm%20interested%20in%20${encodeURIComponent(room.title)}`;
 
 dynamicHtml += `<div class="card ${room.featured ? 'featured' : ''}">
@@ -374,32 +585,50 @@ ${room.imageUrl ? `<img src="${room.imageUrl}" class="card-img" alt="Property Ro
 </div>
 <div class="card-actions">
 <a href="${whatsappLink}" target="_blank" style="padding: 10px; background: #25d366; color: white; text-align: center; border-radius: 6px; text-decoration: none; font-weight: bold;">💬 Contact</a>
-${ownershipClaims ? `<button class="btn-danger" data-id="${room.id}">🗑️ Delete</button>` : ''}
 </div>
 </div>`;
 });
 
 targetGrid.innerHTML = dynamicHtml;
-
-// Attaching transactional dynamic garbage clearing routines onto active element trees
-targetGrid.querySelectorAll(".btn-danger").forEach(deleteBtn => {
-deleteBtn.addEventListener("click", (e) => {
-const targetId = e.target.getAttribute("data-id");
-executeListingRemoval(targetId);
-});
-});
 }
 
-async function executeListingRemoval(id) {
+function renderMyListingsPage() {
+const userListings = marketplaceCache.filter(item => item.userId === currentUser.uid);
+const container = document.getElementById("myListingsContainer");
+
+if (userListings.length === 0) {
+container.innerHTML = `<div class="empty-state">You haven't posted any listings yet. <br><a href="javascript:void(0)" onclick="window.showPage('post')" style="color: #1e8449; text-decoration: underline;">Create your first listing</a></div>`;
+return;
+}
+
+let html = "";
+userListings.forEach(room => {
+html += `<div class="my-listings-item">
+<div class="my-listings-info">
+<h4>${escapeHTML(room.title)}</h4>
+<p>📍 ${escapeHTML(room.location)} | 💰 $${room.price.toFixed(2)}/month | 📞 ${escapeHTML(room.phone)}</p>
+<p style="font-size: 0.85rem; color: #999;">Posted: ${new Date(room.createdAt).toLocaleDateString()}</p>
+</div>
+<div class="my-listings-actions">
+<button class="btn-danger" onclick="window.executeListingRemoval('${room.id}')">🗑️ Delete</button>
+</div>
+</div>`;
+});
+
+container.innerHTML = html;
+}
+
+window.showPage = showPage;
+
+window.executeListingRemoval = (id) => {
 if (confirm("Are you sure you want to completely remove this listing from the network?")) {
-try {
-await deleteDoc(doc(db, "rooms", id));
+deleteDoc(doc(db, "rooms", id)).then(() => {
 alert("Listing dropped effectively.");
-} catch (err) {
+}).catch(err => {
 alert("Action Refused: " + err.message);
+});
 }
-}
-}
+};
 
 function escapeHTML(string) {
 const element = document.createElement('div');
@@ -407,12 +636,12 @@ element.textContent = string;
 return element.innerHTML;
 }
 
-// Attach reactive input processing registers onto individual filter elements
+// Attach reactive input processing
 ['filterLocation', 'filterMinPrice', 'sortBy'].forEach(elementId => {
 const element = document.getElementById(elementId);
 if (element) {
-element.addEventListener('change', renderPlatformView);
-element.addEventListener('input', renderPlatformView);
+element.addEventListener('change', renderBrowsePage);
+element.addEventListener('input', renderBrowsePage);
 }
 });
 </script>
